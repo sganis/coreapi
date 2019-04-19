@@ -1,0 +1,44 @@
+﻿@model UserModel
+@{
+    ViewData["Title"] = "Login";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<div>
+    <div class="mt-4 mb-2 col-md-5">
+        <h1>Subscriptions</h1>
+        Hi, @Model.Username .<br />
+        Manage your subscriptions here.
+    </div>
+    <div class="mt-4 mb-2 col-md-5">
+        <h3>Linux data service:</h3>
+    </div>
+    @if (!Model.IsSubscribedLinux)
+    {
+        <form asp-action="SubscribeLinux" method="post" class="form-horizontal" role="form">
+            <div class="form-group">
+                <div class="col-md-5">
+                    <input asp-for="LinuxPassword" class="form-control" />
+                    <span asp-validation-for="LinuxPassword" class="text-danger"></span>
+                </div>
+            </div>
+            <div class="form-group">
+                <div class="col-md-5">
+                    <input type="submit" class="btn btn-primary" value="Subscribe" />
+                </div>
+            </div>
+        </form>
+    }
+    else
+    {
+        <form asp-action="UnsubscribeLinux" method="post" class="form-horizontal" role="form">
+            <div class="form-group">
+                <div class="col-md-5">
+                    <input type="submit" class="btn btn-primary" value="Unsubscribe" />
+                </div>
+            </div>
+        </form>
+    }
+
+</div>
+

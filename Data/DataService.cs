@@ -14,19 +14,22 @@ using System.Runtime.Serialization;
 using System.Xml;
 using System.ServiceProcess;
 using Newtonsoft.Json;
+using coreapi.Models;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.Extensions.Configuration;
+using coreapi.Utilities;
 
-namespace coreapi
+namespace coreapi.Data
 {
 
     public class DataService : IDataService
     {
         #region Properties
 
-        public SshClient Ssh { get; set; }
-        public SftpClient Sftp { get; set; }
         public string Error { get; set; }
-        public bool Connected { get { return Ssh != null && Ssh.IsConnected; } }
+        public string LinuxHost { get; set; }
         
+        public IConfiguration Configuration { get; set; }
 
         private string appPath;
         public string AppPath
@@ -54,10 +57,17 @@ namespace coreapi
             }
         }
 
+        Dictionary<string, UserModel> Users { get; set; }
+        IDataProtector _protector;
+
         #endregion
 
         public DataService()
         {
+            // fixme: get this from persistent storage and protected 
+            Users = new Dictionary<string, UserModel>();
+            var provider = DataProtectionProvider.Create("corepai");
+            _protector = provider.CreateProtector("encryption");
 
         }
 
@@ -65,19 +75,24 @@ namespace coreapi
 
         #region Core Methods
 
-        public bool Connect(string host, int port, string user, string pkey)
+        public SshClient Connect(string host, int port, string user, string password, string pkey)
         {
+            SshClient ssh = null;
             try
             {
-                var pk = new PrivateKeyFile(pkey);
-                var keyFiles = new[] { pk };
-                Ssh = new SshClient(host, port, user, keyFiles);
-                Ssh.ConnectionInfo.Timeout = TimeSpan.FromSeconds(5);
-                Ssh.Connect();
-                Sftp = new SftpClient(host, port, user, keyFiles);
-                Sftp.ConnectionInfo.Timeout = TimeSpan.FromSeconds(5);
-                Sftp.Connect();
-
+                if(password != null)
+                {
+                    ssh = new SshClient(host, port, user, password);
+                    ssh.ConnectionInfo.Timeout = TimeSpan.FromSeconds(5);
+                }
+                else
+                {
+                    var pk = new PrivateKeyFile(pkey);
+                    var keyFiles = new[] { pk };
+                    ssh = new SshClient(host, port, user, keyFiles);
+                    ssh.ConnectionInfo.Timeout = TimeSpan.FromSeconds(5);
+                }
+                ssh.Connect();
             }
             catch (Renci.SshNet.Common.SshAuthenticationException ex)
             {
@@ -88,48 +103,17 @@ namespace coreapi
             {
                 Error = ex.Message;
             }
-            return Connected;
+            return ssh;
         }
 
-        public ReturnBox RunLocal(string cmd)
-        {
-            // 2 secs slower
-            return RunLocal("cmd.exe", "/C " + cmd);
-        }
-
-        public ReturnBox RunLocal(string cmd, string args)
-        {
-            Logger.Log($"Running local command: {cmd} {args}");
-            ReturnBox r = new ReturnBox();
-            Process process = new Process();
-            ProcessStartInfo startInfo = new ProcessStartInfo
-            {
-                WindowStyle = ProcessWindowStyle.Hidden,
-                CreateNoWindow = true,
-                RedirectStandardError = true,
-                RedirectStandardOutput = true,
-                UseShellExecute = false,
-                FileName = cmd,
-                Arguments = args
-            };
-            process.StartInfo = startInfo;
-            process.Start();
-            process.WaitForExit();
-            r.Output = process.StandardOutput.ReadToEnd();
-            r.Error = process.StandardError.ReadToEnd();
-            r.ExitCode = process.ExitCode;
-            r.Success = r.ExitCode == 0 && String.IsNullOrEmpty(r.Error);
-            return r;
-        }
-
-        public ReturnBox RunRemote(string cmd, int timeout_secs = 3600)
+        public ReturnBox RunRemote(SshClient ssh, string cmd, int timeout_secs = 3600)
         {
             ReturnBox r = new ReturnBox();
-            if (Connected)
+            if (ssh.IsConnected)
             {
                 try
                 {
-                    SshCommand command = Ssh.CreateCommand(cmd);
+                    SshCommand command = ssh.CreateCommand(cmd);
                     command.CommandTimeout = TimeSpan.FromSeconds(timeout_secs);
                     r.Output = command.Execute();
                     r.Error = command.Error;
@@ -144,53 +128,48 @@ namespace coreapi
             return r;
         }
 
-        public ReturnBox DownloadFile(string src, string dst)
-        {
-            ReturnBox r = new ReturnBox();
-            if (Connected)
-            {
-                try
-                {
-                    using (Stream fs = File.Create(dst))
-                    {
-                        Sftp.DownloadFile(src, fs);
-                    }
-                    r.Success = true;
-                }
-                catch (Exception ex)
-                {
-                    r.Error = ex.Message;
-                }
-            }
-            return r;
-        }
-
-        public ReturnBox UploadFile(string src, string dir, string filename)
-        {
-            ReturnBox r = new ReturnBox();
-            if (Connected)
-            {
-                try
-                {
-                    using (var fs = new FileStream(src, FileMode.Open))
-                    {
-                        Sftp.BufferSize = 4 * 1024; // bypass Payload error large files
-                        Sftp.ChangeDirectory(dir);
-                        Sftp.UploadFile(fs, filename, true);
-                    }
-                    r.Success = true;
-                }
-                catch (Exception ex)
-                {
-                    r.Error = ex.Message;
-                }
-            }
-            return r;
-        }
 
         #endregion
 
-       
+        public UserModel GetUser(string username)
+        {
+            if (Users.ContainsKey(username))
+            {
+                return Users[username];
+            }
+            return new UserModel { Username = username };
+        }
+
+        public bool SubscribeLinux(UserModel user)
+        {
+            UserModel u = GetUser(user.Username);
+            if (u.IsSubscribedLinux)
+                return true;
+            var ssh = Connect(LinuxHost, 22, Util.GetLogin(user.Username), user.LinuxPassword, "");
+            if (ssh != null && ssh.IsConnected)
+            {
+                user.Ssh = ssh;
+                user.IsSubscribedLinux = true;
+                user.LinuxPassword = _protector.Protect(user.LinuxPassword);
+                string p = _protector.Unprotect(user.LinuxPassword);
+                Users[user.Username] = user;
+                return true;
+            }
+            return false;
+        }
+        public bool UnsubscribeLinux(UserModel user)
+        {
+            UserModel u = GetUser(user.Username);
+            u.IsSubscribedLinux = false;
+            u.LinuxPassword = null;
+            u.Ssh.Disconnect();
+            u.Ssh.Dispose();
+            return true;
+        }
+
+
+
+
         //#region SSH Management
 
         //ReturnBox TestHost(Drive drive)
@@ -294,7 +273,7 @@ namespace coreapi
         //            {
         //                r.MountStatus = MountStatus.BAD_HOST;
         //            }
-                    
+
         //        }
         //        else if (ex is SshConnectionException)
         //        {
@@ -383,7 +362,7 @@ namespace coreapi
 
         //#endregion
 
-     
+
 
     }
 }

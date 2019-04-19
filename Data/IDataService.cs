@@ -1,21 +1,16 @@
-﻿using Renci.SshNet;
+﻿using coreapi.Models;
+using Renci.SshNet;
 
-namespace coreapi
+namespace coreapi.Data
 {
     public interface IDataService
     {
         string AppPath { get; }
-        bool Connected { get; }
         string Error { get; set; }
-        string LocalAppData { get; }
-        SftpClient Sftp { get; set; }
-        SshClient Ssh { get; set; }
-
-        bool Connect(string host, int port, string user, string pkey);
-        ReturnBox DownloadFile(string src, string dst);
-        ReturnBox RunLocal(string cmd);
-        ReturnBox RunLocal(string cmd, string args);
-        ReturnBox RunRemote(string cmd, int timeout_secs = 3600);
-        ReturnBox UploadFile(string src, string dir, string filename);
+        SshClient Connect(string host, int port, string user, string password, string pkey);
+        ReturnBox RunRemote(SshClient ssh, string cmd, int timeout_secs = 3600);
+        bool SubscribeLinux(UserModel user);
+        bool UnsubscribeLinux(UserModel user);
+        UserModel GetUser(string username);
     }
 }
