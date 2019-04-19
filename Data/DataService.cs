@@ -140,11 +140,11 @@ namespace coreapi.Data
             return new UserModel { Username = username };
         }
 
-        public bool SubscribeLinux(UserModel user)
+        public ReturnBox SubscribeLinux(UserModel user)
         {
             UserModel u = GetUser(user.Username);
             if (u.IsSubscribedLinux)
-                return true;
+                return new ReturnBox { Error = "user already subscribed" };
             var ssh = Connect(LinuxHost, 22, Util.GetLogin(user.Username), user.LinuxPassword, "");
             if (ssh != null && ssh.IsConnected)
             {
@@ -153,18 +153,18 @@ namespace coreapi.Data
                 user.LinuxPassword = _protector.Protect(user.LinuxPassword);
                 string p = _protector.Unprotect(user.LinuxPassword);
                 Users[user.Username] = user;
-                return true;
+                return new ReturnBox { Success = true } ;
             }
-            return false;
+            return new ReturnBox { Error = Error }; ;
         }
-        public bool UnsubscribeLinux(UserModel user)
+        public ReturnBox UnsubscribeLinux(UserModel user)
         {
             UserModel u = GetUser(user.Username);
             u.IsSubscribedLinux = false;
             u.LinuxPassword = null;
             u.Ssh.Disconnect();
             u.Ssh.Dispose();
-            return true;
+            return new ReturnBox { Success = true }; 
         }
 
 

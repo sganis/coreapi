@@ -4,7 +4,13 @@
     Layout = "~/Views/Shared/_Layout.cshtml";
 }
 
-<div>
+<div class="mt-4 mb-2">
+    @if (TempData["error"] != null)
+    {
+    <div class="alert alert-danger" role="alert">
+        @TempData["error"]
+    </div>
+    }
     <div class="mt-4 mb-2 col-md-5">
         <h1>Subscriptions</h1>
         Hi, @Model.Username .<br />
@@ -18,7 +24,7 @@
         <form asp-action="SubscribeLinux" method="post" class="form-horizontal" role="form">
             <div class="form-group">
                 <div class="col-md-5">
-                    <input asp-for="LinuxPassword" class="form-control" />
+                    <input asp-for="LinuxPassword" class="form-control" value="@Model.LinuxPassword" />
                     <span asp-validation-for="LinuxPassword" class="text-danger"></span>
                 </div>
             </div>

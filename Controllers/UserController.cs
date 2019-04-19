@@ -32,12 +32,18 @@ namespace coreapi.Controllers
         public ActionResult SubscribeLinux(UserModel usermodel)
         {
             UserModel u = _dataService.GetUser(User.Identity.Name);
+            usermodel.Username = u.Username;
             if (!u.IsSubscribedLinux)
             {
                 if (ModelState.IsValid)
                 {
-                    usermodel.Username = u.Username;
-                    _dataService.SubscribeLinux(usermodel);
+                    var rb = _dataService.SubscribeLinux(usermodel);
+                    //TempData["error"] = rb.Error;
+                    if (!string.IsNullOrEmpty(rb.Error))
+                    {
+                        ModelState.AddModelError("LinuxPassword", rb.Error);
+                        return View("Index", usermodel);
+                    }
                     return RedirectToAction("Index");
                 }
             }
