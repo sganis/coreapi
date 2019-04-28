@@ -12,8 +12,8 @@ namespace coreapi.Controllers
 {
 	[Authorize]
 	[Route("[controller]")]
-	[ApiController]
-	public class LinuxController : ControllerBase
+	//[ApiController]
+	public class LinuxController : Controller
 	{
 		private readonly IDataService _dataService;        
 
@@ -24,17 +24,18 @@ namespace coreapi.Controllers
 
 		// GET linux/path
 		[HttpGet("{*path}")]
-		public ActionResult<ReturnBox> Index(string path)
+		public JsonResult Index(string path)
 		{
             UserModel user = _dataService.GetUser(User.Identity.Name);
             if(!user.IsSubscribedLinux)
             {
-                return new ReturnBox {
+                return Json(new ReturnBox
+                {
                     Error = $"{user.Username} is not subscribed to this service.\n"
-                };
+                });
             }
             var rb = _dataService.RunRemote(user.Ssh, $"ls -l /{path}");
-            return rb;            
+            return Json(rb);            
 		}
 
 		

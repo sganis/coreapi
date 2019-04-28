@@ -4,7 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.HttpsPolicy;
+//using Microsoft.AspNetCore.HttpsPolicy;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Server.IISIntegration;
 using Microsoft.Extensions.Configuration;
@@ -27,7 +27,7 @@ namespace coreapi
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
-            services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_2_1);
+            services.AddMvc(); //.SetCompatibilityVersion(CompatibilityVersion.Version_2_1);
             services.AddAuthentication(Microsoft.AspNetCore.Server.IISIntegration.IISDefaults.AuthenticationScheme);
             services.AddDataProtection();
             services.AddSingleton<IDataService, DataService>(s => {
@@ -48,7 +48,7 @@ namespace coreapi
             }
             else
             {
-                app.UseHsts();
+                //app.UseHsts();
             }
             app.UseStaticFiles();
             //app.UseHttpsRedirection();
